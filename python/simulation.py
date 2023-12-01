@@ -1230,6 +1230,7 @@ class Simulation:
         force_complex_fields: bool = False,
         default_material: Medium = mp.Medium(),
         m: float = 0,
+        bfast_scaled_k: Optional[Vector3Type] = None,
         k_point: Union[Vector3Type, bool] = False,
         kz_2d: str = "complex",
         extra_materials: Optional[List[Medium]] = None,
@@ -1527,6 +1528,7 @@ class Simulation:
         self.last_eps_filename = ""
         self.output_h5_hook = lambda fname: False
         self.interactive = False
+        self.bfast_scaled_k = (0, 0, 0) if bfast_scaled_k is None else bfast_scaled_k
         self.is_cylindrical = False
         self.material_function = material_function
         self.epsilon_func = epsilon_func
@@ -2475,6 +2477,7 @@ class Simulation:
             not self.accurate_fields_near_cylorigin,
             self.loop_tile_base_db,
             self.loop_tile_base_eh,
+            self.bfast_scaled_k,
         )
 
         if self.force_all_components and self.dimensions != 1:
@@ -2768,6 +2771,7 @@ class Simulation:
         """
         if not dname:
             dname = self.get_filename_prefix() + "-out"
+            self.filename_prefix = None
 
         closure = {"trashed": False}
 
@@ -2783,7 +2787,6 @@ class Simulation:
 
         if self.fields is not None:
             hook()
-        self.filename_prefix = None
 
         return dname
 
