@@ -22,7 +22,7 @@ def southpole(R):
         return mp.Medium(index=A-B*math.exp(-C*z_depth))
 #Frequency
 freq_cw = 100.0 #MHz
-wavelength = 1300/freq_cw #m.MHz or m / us
+wavelength = 300/freq_cw #m.MHz or m / us
 freq_meep = 1/wavelength
 amp_tx = 1.0
 
