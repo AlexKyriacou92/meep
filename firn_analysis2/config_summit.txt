@@ -1,0 +1,16 @@
+[GEOMETRY]
+iceDepth = 80.0
+airHeight = 10.0
+iceRange = 100.0
+boreholeRadius = 0.15
+pad = 2.0
+resolution = 12.5
+
+[REFRACTIVE INDEX]
+data_file = spice2019_indOfRef_core1_5cm.txt
+
+[TRANSMITTER]
+sourceDepth = 10.0
+sourceRange = 0.0
+frequency = 100.0
+sourceAmp = 1.0
