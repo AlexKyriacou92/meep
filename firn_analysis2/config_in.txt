@@ -1,6 +1,10 @@
+[SETTINGS]
+prefix = southpole_dipole_data_
+path2output = mpi_tests
+
 [GEOMETRY]
-iceDepth = 100.0
-airHeight = 10.0
+iceDepth = 200.0
+airHeight = 20.0
 iceRange = 200.0
 boreholeRadius = 0.15
 pad = 2.0
@@ -10,7 +14,10 @@ resolution = 12.5
 data_file = spice2019_indOfRef_core1_5cm.txt
 
 [TRANSMITTER]
-sourceDepth = 4.0
+sourceDepth = -80.0
 sourceRange = 0.0
 frequency = 350.0
 sourceAmp = 1.0
+
+[RECEIVER]
+rx_list = rx_list.txt
