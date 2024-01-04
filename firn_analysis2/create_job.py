@@ -15,11 +15,13 @@ cluster_settings = config['CLUSTER']
 
 NODES_MIN = int(cluster_settings['NODES_MIN'])
 NODES_MAX = int(cluster_settings['NODES_MAX'])
+
 PARTITION = cluster_settings['PARTITION']
 DAYS = int(cluster_settings['DAYS'])
 HOURS = int(cluster_settings['HOURS'])
 MEMORY = int(cluster_settings['MEMORY']) # in MB
-
+TASKS = int(cluster_settings['TASKS'])
+NCPUS = int(cluster_settings['NCPUS'])
 
 job_settings = config['JOB']
 operator = job_settings['operator']
@@ -28,7 +30,7 @@ arg = job_settings['arg']
 prefix = job_settings['prefix']
 mpi = job_settings['mpi']
 py_cmd = operator + ' ' + script + ' ' + arg
-cmd = mpi + ' -n ' + str(NODES_MAX) + ' ' + py_cmd
+cmd = mpi + ' -n ' + str(NCPUS) + ' ' + py_cmd
 
 fname_shell = prefix + '.sh'
 fname_out = prefix + '.out'
