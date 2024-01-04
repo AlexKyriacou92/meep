@@ -142,13 +142,13 @@ def nProfile_func(R):
 # Get RX Functions
 #================================================================
 rxList = []
-nRx = len(rxList)
+nRx = len(rx_list)
 for i in range(nRx):
     rx_x = rx_list[i][0]
     rx_z = rx_list[i][1]
     pt_ij = mp.Vector3(rx_x, mp.inf, rx_z)
     rxList.append(pt_ij)
-
+print(rxList)
 c_mns = 0.3 #Speed of Light in m / ns
 
 dt_ns = 0.5 # ns
