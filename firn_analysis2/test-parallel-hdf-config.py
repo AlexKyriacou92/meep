@@ -51,11 +51,18 @@ pad = float(geometry['pad'])
 
 sourceDepth = float(transmitter['sourceDepth']) #depth of diple below ice
 sourceRange = float(transmitter['sourceRange']) + boreholeRadius/2
+
+print('sourceDepth', sourceDepth)
 #Frequency
 frequency = float(transmitter['frequency']) #MHz
+bandwidth = float(transmitter['bandwidth'])
 c_meep = 300.0 # m/us
 wavelength = c_meep/frequency #m.MHz or m / us
 freq_meep = 1/wavelength #Meep Units
+
+wavelength_band = c_meep/bandwidth
+band_meep = 1/wavelength_band
+
 sourceAmp = float(transmitter['sourceAmp'])
 R_tot = iceRange + pad
 
@@ -99,7 +106,7 @@ pml_layers = [mp.PML(pad)]
 cell = mp.Vector3(2*R_tot, mp.inf, Z_tot)
 
 geometry_dipole = [
-    mp.Block(center=mp.Vector3(r_cent, 0, 0),
+    mp.Block(center=mp.Vector3(r_cent, 0, Z_icecent),
              size=mp.Vector3(boreholeRadius, mp.inf, Z_tot),
              material=mp.Medium(index=nair)),
     mp.Block(center=mp.Vector3(R_cent, 0, H_aircent),
@@ -113,11 +120,14 @@ geometry_dipole = [
 
 # create the source
 sources_dipole = []
-sources_dipole.append(mp.Source(mp.ContinuousSource(frequency=freq_meep),
-            component=mp.Ez,
-            center=mp.Vector3(r_cent/2,0,sourceDepth),
-            size=mp.Vector3(0,0,0)))
+t_begin = 20.0
 
+source1 = mp.Source(mp.GaussianSource(frequency=freq_meep, fwidth=band_meep, start_time = t_begin),
+                    component=mp.Ez,
+                    center=mp.Vector3(r_cent/2,0,sourceDepth),
+                    size=mp.Vector3(0,0,0))
+
+sources_dipole.append(source1)
 # create simulation
 sim_dipole = mp.Simulation(force_complex_fields=True,
                 cell_size=cell,
@@ -169,7 +179,14 @@ def get_amp_at_t2(sim):
     ii_step = int(float(tstep) / factor) - 1 #TODO: Check if this starts as 0 or 1
     for i in range(nRx):
         rx_pt = rxList[i]
+
         amp_at_pt = sim.get_field_point(c=mp.Ez, pt=rx_pt)
+        '''
+        if rx_pt.z == sourceDepth and rx_pt.x == 20:
+            print('field at z = ', sourceDepth, 'm, E(z) =', amp_at_pt)
+        if rx_pt.z == -sourceDepth and rx_pt.x == 20:
+            print('field at z = ', -sourceDepth, 'm, E(z) =', amp_at_pt)
+        '''
         pulse_rx_arr[i, ii_step] = amp_at_pt
 
 path2sim = settings['path2output']
@@ -178,6 +195,9 @@ sim_dipole.use_output_directory(path2sim)
 sim_dipole.run(mp.at_every(dt_C, get_amp_at_t2),until=t_start)
 
 fname_out = path2sim + '/' + fname_prefix + 'z_tx_' + str(sourceDepth) + 'm_freq=' + str(frequency) + 'MHz_out.h5'
+
+for i in range(nRx):
+    print('check if all elements are zero', np.all(pulse_rx_arr[i] == 0), pulse_rx_arr[i])
 
 def add_data_to_hdf(hdf_in, label, dataset):
     '''
