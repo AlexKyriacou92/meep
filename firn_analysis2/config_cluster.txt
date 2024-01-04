@@ -1,0 +1,14 @@
+[CLUSTER]
+NODES_MIN = 1
+NODES_MAX = 1
+PARTITION = 'physastro'
+DAYS = 0
+HOURS = 1
+MEMORY = 10000
+
+[JOB]
+prefix = summit_job
+mpi = mpirun
+operator = python
+script = test-parallel-hdf-config.py
+arg = config-in.txt
