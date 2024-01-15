@@ -107,7 +107,7 @@ cell = mp.Vector3(2*R_tot, mp.inf, Z_tot)
 
 geometry_dipole = [
     mp.Block(center=mp.Vector3(r_cent, 0, Z_icecent),
-             size=mp.Vector3(boreholeRadius, mp.inf, Z_tot),
+             size=mp.Vector3(boreholeRadius, mp.inf, iceDepth),
              material=mp.Medium(index=nair)),
     mp.Block(center=mp.Vector3(R_cent, 0, H_aircent),
              size=mp.Vector3(iceRange_wo_bh, mp.inf, airHeight),
@@ -122,10 +122,15 @@ geometry_dipole = [
 sources_dipole = []
 t_begin = 20.0
 
+
 source1 = mp.Source(mp.GaussianSource(frequency=freq_meep, fwidth=band_meep, start_time = t_begin),
                     component=mp.Ez,
-                    center=mp.Vector3(r_cent/2,0,sourceDepth),
+                    center=mp.Vector3(sourceRange, 0, sourceDepth),
                     size=mp.Vector3(0,0,0))
+'''
+source1 = mp.Source(mp.ContinuousSource(frequency=freq_meep),component=mp.Ez,center=mp.Vector3(sourceRange, 0, sourceDepth),
+                    size=mp.Vector3(0,0,0))
+'''
 
 sources_dipole.append(source1)
 # create simulation
