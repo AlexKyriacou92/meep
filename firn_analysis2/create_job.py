@@ -37,4 +37,4 @@ fname_out = prefix + '.out'
 job_name = prefix
 make_job(fname_shell=fname_shell, fname_outfile=fname_out, jobname=job_name, command=cmd,
          nNodes_min=NODES_MIN, nNodes_max=NODES_MAX, partition=PARTITION,
-         days=DAYS, hours=HOURS, nodeMemory=MEMORY)
+         days=DAYS, hours=HOURS, nodeMemory=MEMORY, tasks = TASKS, ncpus=NCPUS)
