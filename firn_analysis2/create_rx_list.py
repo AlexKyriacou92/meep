@@ -5,8 +5,8 @@ import sys
 
 fname_out = sys.argv[1]
 
-rx_ranges = [20, 50, 100, 150, 180]
-rx_depths = [-10, -2, 2, 5, 8, 10, 12, 15, 20, 40, 80, 100, 150, 180]
+rx_ranges = [20, 50, 80]
+rx_depths = [-10, -2, 2, 5, 8, 10, 12, 15, 20, 40, 80]
 
 nRanges = len(rx_ranges)
 nDepths = len(rx_depths)
