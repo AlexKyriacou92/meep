@@ -34,7 +34,8 @@ if 'NCPUS' in cluster_settings.keys():
 else:
     NCPUS = 'NONE'
 
-def make_job(fname_shell, fname_outfile, jobname, command, nNodes_min=NODES_MIN, nNodes_max=NODES_MAX, partition=PARTITION, days=DAYS, hours=HOURS, nodeMemory=MEMORY, tasks = TASKS, ncpus=NCPUS):
+def make_job(fname_shell, fname_outfile, jobname, command, nNodes_min=NODES_MIN, nNodes_max=NODES_MAX,
+             partition=PARTITION, days=DAYS, hours=HOURS, nodeMemory=MEMORY, tasks = TASKS, ncpus=NCPUS):
     '''
     Function creates a shell file to run 1 job on Pleaides
 
@@ -69,9 +70,9 @@ def make_job(fname_shell, fname_outfile, jobname, command, nNodes_min=NODES_MIN,
     else:
         fout.write(sbatch + " --nodes=" + str(nNodes_min) + "-" + str(nNodes_max) + "\n")
     if tasks != "NONE":
-        fout.write(sbatch + " --ntasks=" + str(TASKS) + "\n")
+        fout.write(sbatch + " --ntasks=" + str(tasks) + "\n")
     if ncpus != "NONE":
-        fout.write(sbatch + " --cpus-per-task=" + str(NCPUS) + "\n")
+        fout.write(sbatch + " --cpus-per-task=" + str(ncpus) + "\n")
     fout.write(sbatch + " --mem-per-cpu=" + str(nodeMemory) + " # in MB\n")
     fout.write(sbatch + " -o " + str(fname_outfile) + "\n")
     fout.write(command)
