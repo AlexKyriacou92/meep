@@ -5,6 +5,7 @@ import sys
 import configparser
 from mpi4py import MPI
 import meep as mp
+import os
 
 comm = MPI.COMM_WORLD
 
@@ -13,8 +14,9 @@ if len(sys.argv) == 2:
 else:
     fname_config = 'config_in.txt'
 
+config_file = os.path.join(os.path.dirname(__file__), fname_config)
 config = configparser.ConfigParser()
-config.read(fname_config)
+config.read(config_file)
 
 geometry = config['GEOMETRY']
 transmitter = config['TRANSMITTER']
