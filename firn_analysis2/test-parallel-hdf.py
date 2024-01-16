@@ -1,7 +1,7 @@
 import numpy as np
 import math
 import h5py
-#import cmasher as cmr
+import cmasher as cmr
 import sys
 
 from mpi4py import MPI

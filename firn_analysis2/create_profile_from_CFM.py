@@ -71,5 +71,5 @@ ax.legend()
 pl.show()
 '''
 
-fname_out = 'nProf_CFM_' + str(year_i) + '_' + str(month_i) + '.txt'
+fname_out = 'nProf_CFM_' + str(int(year_i)) + '_' + str(int(month_i)) + '.txt'
 create_profile(n_profile_select, z_profile, fname_out)
