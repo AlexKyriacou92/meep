@@ -10,10 +10,10 @@ comm = MPI.COMM_WORLD
 
 print("Testing HDF parallel (from process %d)" % MPI.COMM_WORLD.Get_rank())
 nair = 1.0      # index of air
-iceDepth = 100     # depth of ice
+iceDepth = 1000     # depth of ice
 airHeight = 15     # height of air
 
-iceRange = 200 #radius of domain
+iceRange = 1000 #radius of domain
 r_bh = 0.15 #radius of borehole
 pad = 2
 z_tx_in = 20.0
