@@ -35,7 +35,7 @@ else:
     NCPUS = 'NONE'
 
 def make_job(fname_shell, fname_outfile, jobname, command, nNodes_min=NODES_MIN, nNodes_max=NODES_MAX,
-             partition=PARTITION, days=DAYS, hours=HOURS, nodeMemory=MEMORY, tasks = TASKS, ncpus=NCPUS):
+             partition=PARTITION, days=DAYS, hours=HOURS, nodeMemory=MEMORY, tasks = TASKS, ncpus=NCPUS, account='NONE', email='NONE'):
     '''
     Function creates a shell file to run 1 job on Pleaides
 
@@ -73,6 +73,10 @@ def make_job(fname_shell, fname_outfile, jobname, command, nNodes_min=NODES_MIN,
         fout.write(sbatch + " --ntasks=" + str(tasks) + "\n")
     if ncpus != "NONE":
         fout.write(sbatch + " --cpus-per-task=" + str(ncpus) + "\n")
+    if account != "NONE":
+        fout.write(sbatch + " --account=" + str(account) + "\n")
+    if email != "NONE":
+        fout.write(sbatch + " --mail-user=" + str(email) + "\n")
     fout.write(sbatch + " --mem-per-cpu=" + str(nodeMemory) + " # in MB\n")
     fout.write(sbatch + " -o " + str(fname_outfile) + "\n")
     fout.write(command)
