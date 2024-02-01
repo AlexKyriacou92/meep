@@ -131,20 +131,6 @@ sim_dipole = mp.Simulation(force_complex_fields=True,
                 sources=sources_dipole,
                 resolution=resolution)
 
-#================================================================
-#  Make Refractive Index Profile
-#=================================================================
-#TODO: Why is this here??
-'''
-def nProfile_func(R):
-    z = R[2]
-    A = 1.78
-    B = 0.43
-    C = 0.0132 #1/m
-    #return mp.Medium(index=A-B*math.exp(-C*(z + Z_tot/2 - H_air)))
-    return mp.Medium(index= A - B * math.exp(-C * z))
-'''
-
 #=================================================================
 # Get RX Functions
 #================================================================
