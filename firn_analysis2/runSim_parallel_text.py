@@ -132,7 +132,7 @@ def cylindrical_meep(fname_config):
     # filename
     path2sim = settings['path2output']
     fname_out = path2sim + '/' + fname_prefix + 'z_tx_' + str(sourceDepth) + 'm_freq=' + str(frequency) + 'MHz_out.h5'
-    output_hdf = h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD)
+    output_hdf = h5py.File(fname_out, 'a', driver='mpio', comm=comm)
 
     # Save Features
     output_hdf.attrs['iceDepth'] = iceDepth
@@ -174,15 +174,7 @@ def cylindrical_meep(fname_config):
     nSteps = int(t_start / dt_C) + 10
     print('nSteps =', nSteps)
 
-    # TODO: Create a Memmap Array to Save Data to (will this work with parallel MPI??)
-    '''
-    rxPulses = util.create_memmap('output.npy', dimensions=(nRx, nSteps), data_type='complex')
-    for i in range(nRx):
-        rand1 = np.random.random(nSteps)
-        rand2 = np.random.random(nSteps)
-        c = rand1 + 1j*rand2
-        rxPulses[i] = c
-    '''
+    #Create DataSet to Save the Pulses at RX
     rxPulses = util.add_dataset(output_hdf, 'rxPulses', dimensions=(nRx, nSteps),dtype='complex')
     def save_amp_at_t(sim):
         factor = dt_m / dt_C
