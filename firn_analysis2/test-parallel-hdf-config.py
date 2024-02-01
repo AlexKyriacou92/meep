@@ -6,6 +6,7 @@ import configparser
 from mpi4py import MPI
 import meep as mp
 import os
+from util import get_data, findNearest
 
 comm = MPI.COMM_WORLD
 
@@ -29,17 +30,6 @@ fname_data = ref_index['data_file']
 fname_rx_list = receiver['rx_list']
 
 rx_list = np.genfromtxt(fname_rx_list)
-
-def get_data(fname_txt):
-    n_data = np.genfromtxt(fname_txt)
-    zprof = n_data[:,0]
-    nprof = n_data[:,1]
-    return nprof, zprof
-
-def findNearest(x_arr, x):
-    dx = abs(x_arr - x)
-    ii = np.argmin(dx)
-    return ii
 
 nprof_sp, zprof_sp = get_data(fname_data)
 
@@ -118,11 +108,9 @@ geometry_dipole = [
              material=nProfile_data)
 ]
 
-
 # create the source
 sources_dipole = []
 t_begin = 20.0
-
 
 source1 = mp.Source(mp.GaussianSource(frequency=freq_meep, fwidth=band_meep, start_time = t_begin),
                     component=mp.Ez,
@@ -146,6 +134,8 @@ sim_dipole = mp.Simulation(force_complex_fields=True,
 #================================================================
 #  Make Refractive Index Profile
 #=================================================================
+#TODO: Why is this here??
+'''
 def nProfile_func(R):
     z = R[2]
     A = 1.78
@@ -153,6 +143,7 @@ def nProfile_func(R):
     C = 0.0132 #1/m
     #return mp.Medium(index=A-B*math.exp(-C*(z + Z_tot/2 - H_air)))
     return mp.Medium(index= A - B * math.exp(-C * z))
+'''
 
 #=================================================================
 # Get RX Functions
@@ -234,17 +225,19 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     rx_label = 'rxList'
     pulse_label = 'rxPulses'
     tspace_label = 'tspace'
+    '''
     Ez_label = 'Ez'
     Er_label = 'Er'
     eps_label = 'epsilon_r'
     Ez_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Ez)
     Er_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Er)
     Eps_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Dielectric)
+    '''
 
     add_data_to_hdf(output_hdf, rx_label, rxList_out)
     add_data_to_hdf(output_hdf, pulse_label, pulse_rx_arr)
-    add_data_to_hdf(output_hdf, Ez_label, Ez_data)
-    add_data_to_hdf(output_hdf, Er_label, Er_data)
+    #add_data_to_hdf(output_hdf, Ez_label, Ez_data)
+    #add_data_to_hdf(output_hdf, Er_label, Er_data)
     add_data_to_hdf(output_hdf, tspace_label, tspace)
-    add_data_to_hdf(output_hdf, eps_label, Eps_data)
+    #add_data_to_hdf(output_hdf, eps_label, Eps_data)
     output_hdf.close()
