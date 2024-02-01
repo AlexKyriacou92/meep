@@ -82,14 +82,6 @@ def cylindrical_meep(fname_config):
     print('H_aircent', H_aircent)
     print('Z_icecent', Z_icecent)
 
-    def nProfile_func(R):
-        z = R[2]
-        A = 1.78
-        B = 0.43
-        C = 0.0132  # 1/m
-        # return mp.Medium(index=A-B*math.exp(-C*(z + Z_tot/2 - H_air)))
-        return mp.Medium(index=A - B * math.exp(-C * z))
-
     def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp):
         z = R[2]
         ii_z = findNearest(zprof_data, z)
@@ -99,7 +91,7 @@ def cylindrical_meep(fname_config):
     ##*********************************************************************##
 
     ##**********************Simulation Setup*******************************##
-    dimensions = mp.CYLINDRICAL  # Cylindrical Coordinate Systen
+    sim_dimensions = mp.CYLINDRICAL  # Cylindrical Coordinate Systen
     pml_layers = [mp.PML(pad)]  # Add Absorbing Layer 'Padding'
     cell = mp.Vector3(2 * R_tot, mp.inf, Z_tot)  # Cell: Simulation Geometry
 
@@ -130,7 +122,7 @@ def cylindrical_meep(fname_config):
     # Create Simulation
     sim_dipole = mp.Simulation(force_complex_fields=True,
                                cell_size=cell,
-                               dimensions=mp.CYLINDRICAL,
+                               dimensions=sim_dimensions,
                                boundary_layers=pml_layers,
                                geometry=geometry_dipole,
                                sources=sources_dipole,
@@ -172,7 +164,6 @@ def cylindrical_meep(fname_config):
     # ================================================================
 
     c_mns = 0.3  # Speed of Light in m / ns
-
     dt_ns = 0.5  # ns
     dt_m = dt_ns * c_mns  # Meep Units a / c
     Courant = 0.5
@@ -192,22 +183,21 @@ def cylindrical_meep(fname_config):
         c = rand1 + 1j*rand2
         rxPulses[i] = c
     '''
-    rxPulses = np.zeros(shape=(nRx, nSteps), dtype='complex')
-    output_hdf.create_dataset('rxPulses', data=rxPulses)
+    rxPulses = util.add_dataset(output_hdf, 'rxPulses', dimensions=(nRx, nSteps),dtype='complex')
     def save_amp_at_t(sim):
         factor = dt_m / dt_C
         tstep = sim.timestep()
         ii_step = int(float(tstep) / factor) - 1
-        rxPulses_out = np.array(output_hdf['rxPulses'])
         for i in range(nRx):
             rx_pt = rxList[i]
             amp_at_pt = sim.get_field_point(c=mp.Ez, pt=rx_pt)
-            rxPulses_out[i, ii_step] = amp_at_pt
+            rxPulses[i, ii_step] = amp_at_pt
 
     path2sim = settings['path2output']
     sim_dipole.init_sim()
     sim_dipole.use_output_directory(path2sim)
     sim_dipole.run(mp.at_every(dt_C, save_amp_at_t), until=t_start)
+    output_hdf.close()
     #TODO: Do I save Eps_data and Ez_data or not?
 
 if __name__ == '__main__':
