@@ -208,6 +208,7 @@ def cylindrical_meep(fname_config):
     sim_dipole.init_sim()
     sim_dipole.use_output_directory(path2sim)
     sim_dipole.run(mp.at_every(dt_C, save_amp_at_t), until=t_start)
+    #TODO: Do I save Eps_data and Ez_data or not?
 
 if __name__ == '__main__':
     print('Begin Simulation')
