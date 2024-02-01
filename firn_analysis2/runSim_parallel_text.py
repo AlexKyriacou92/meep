@@ -176,6 +176,16 @@ def cylindrical_meep(fname_config):
 
     #Create DataSet to Save the Pulses at RX
     rxPulses = util.add_dataset(output_hdf, 'rxPulses', dimensions=(nRx, nSteps),dtype='complex')
+    tspace = np.linspace(0, t_start / c_mns, nSteps)
+
+    eps_label = 'epsilon_r'
+    tspace_label = 'tspace'
+    #Ez_label = 'Ez'
+    #Er_label = 'Er'
+    rx_label = 'rxList'
+    add_data_to_hdf(output_hdf, tspace_label, tspace)
+    add_data_to_hdf(output_hdf, rx_label, rxList_out)
+
     def save_amp_at_t(sim):
         factor = dt_m / dt_C
         tstep = sim.timestep()
@@ -185,8 +195,10 @@ def cylindrical_meep(fname_config):
             amp_at_pt = sim.get_field_point(c=mp.Ez, pt=rx_pt)
             rxPulses[i, ii_step] = amp_at_pt
 
-    path2sim = settings['path2output']
     sim_dipole.init_sim()
+    Eps_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Dielectric)
+    add_data_to_hdf(output_hdf, eps_label, Eps_data)
+
     sim_dipole.use_output_directory(path2sim)
     sim_dipole.run(mp.at_every(dt_C, save_amp_at_t), until=t_start)
     output_hdf.close()
