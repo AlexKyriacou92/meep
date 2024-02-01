@@ -196,8 +196,8 @@ def cylindrical_meep(fname_config):
             rxPulses[i, ii_step] = amp_at_pt
 
     sim_dipole.init_sim()
-    Eps_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Dielectric)
-    add_data_to_hdf(output_hdf, eps_label, Eps_data)
+    #Eps_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Dielectric)
+    #add_data_to_hdf(output_hdf, eps_label, Eps_data)
 
     sim_dipole.use_output_directory(path2sim)
     sim_dipole.run(mp.at_every(dt_C, save_amp_at_t), until=t_start)
