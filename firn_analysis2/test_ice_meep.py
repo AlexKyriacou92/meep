@@ -106,7 +106,7 @@ source1 = mp.Source(mp.GaussianSource(frequency=freq_meep, fwidth=band_meep, sta
                     center=mp.Vector3(sourceRange, 0, sourceDepth),
                     size=mp.Vector3(0,0,0))
 
-ources_dipole.append(source1)
+sources_dipole.append(source1)
 # create simulation
 sim_dipole = mp.Simulation(force_complex_fields=True,
                 cell_size=cell,
