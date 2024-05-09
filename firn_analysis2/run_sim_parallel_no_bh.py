@@ -90,7 +90,8 @@ resolution = 12.5	#how many pixels per meter
 mpp = 1/resolution    # meters per pixel
 column_size = iceRange/mpp	# number of pixels in the column
 vice = 1/nice   	# phase velocity in ice
-t_start = 2*R_tot/vice # approximate time to reach steady state
+t_start = R_tot/vice # approximate time to reach steady state
+#TODO: Check, t_start can be shorter
 
 print('r_tx=', sourceRange)
 print('H_aircent', H_aircent)
@@ -116,15 +117,19 @@ dimensions = mp.CYLINDRICAL
 pml_layers = [mp.PML(pad)]
 cell = mp.Vector3(2*R_tot, mp.inf, Z_tot)
 
-geometry_dipole = [
+
+'''
     mp.Block(center=mp.Vector3(r_cent, 0, Z_icecent),
              size=mp.Vector3(boreholeRadius, mp.inf, iceDepth),
              material=mp.Medium(index=nair)),
-    mp.Block(center=mp.Vector3(R_cent, 0, H_aircent),
-             size=mp.Vector3(iceRange_wo_bh, mp.inf, airHeight),
+'''
+#TODO: Check -> Change remove borehole from geometry
+geometry_dipole = [
+    mp.Block(center=mp.Vector3(R_cent, 0, H_aircent), #AIR
+             size=mp.Vector3(iceRange, mp.inf, airHeight),
              material=mp.Medium(index=nair)),
-    mp.Block(center=mp.Vector3(R_cent, 0, Z_icecent),
-             size=mp.Vector3(iceRange_wo_bh, mp.inf, iceDepth),
+    mp.Block(center=mp.Vector3(R_cent, 0, Z_icecent), #ICE
+             size=mp.Vector3(iceRange, mp.inf, iceDepth),
              material=nProfile_data)
 ]
 
@@ -132,6 +137,7 @@ geometry_dipole = [
 sources_dipole = []
 t_begin = 20.0
 
+#TODO: Check other means of signal generation
 source1 = mp.Source(mp.GaussianSource(frequency=freq_meep, fwidth=band_meep, start_time = t_begin),
                     component=mp.Ez,
                     center=mp.Vector3(sourceRange, 0, sourceDepth),
@@ -160,6 +166,7 @@ for i in range(nRx):
 print(rxList)
 c_mns = 0.3 #Speed of Light in m / ns
 
+#TODO: Check time definition!
 dt_ns = 0.5 # ns
 dt_m = dt_ns * c_mns # Meep Units a / c
 Courant = 0.5
