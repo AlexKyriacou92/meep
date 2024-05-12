@@ -46,13 +46,23 @@ print('ref index')
 for key in ref_index.keys():
     print(key, ref_index[key])
 
+#UNITS OF LENGTH ARE IN METERS
+'''
+Meep: c = 1
+Length scale a = 1m
+Time = a/c = 1m
+Frequency = c/a (or 'inverse meters')
+
+
+'''
+
 fname_prefix = settings['prefix']
 fname_data = ref_index['data_file']
 fname_rx_list = receiver['rx_list']
 
-rx_list = np.genfromtxt(fname_rx_list)
+rx_list = np.genfromtxt(fname_rx_list) #Receiver List
 
-nprof_sp, zprof_sp = get_data(fname_data)
+nprof_sp, zprof_sp = get_data(fname_data) #Refractive Index imported from file
 
 nair = 1.0      # index of air
 iceDepth = float(geometry['iceDepth'])  # depth of ice
@@ -60,71 +70,152 @@ airHeight = float(geometry['airHeight'])     # height of air
 iceRange = float(geometry['iceRange']) #radius of domain
 boreholeRadius = float(geometry['boreholeRadius']) #radius of borehole
 pad = float(geometry['pad'])
+dpml = pad/2
 
 sourceDepth = float(transmitter['sourceDepth']) #depth of diple below ice
 sourceRange = float(transmitter['sourceRange']) + boreholeRadius/2
 
 print('sourceDepth', sourceDepth)
 #Frequency
-frequency = float(transmitter['frequency']) #MHz
-bandwidth = float(transmitter['bandwidth'])
-c_meep = 300.0 # m/us
-wavelength = c_meep/frequency #m.MHz or m / us
-freq_meep = 1/wavelength #Meep Units
+freq_MHz = float(transmitter['frequency']) # MHz
+band_MHz = float(transmitter['bandwidth']) # MHz
+freq_GHz = freq_MHz/1e3
+band_GHz = band_MHz/1e3
+a_scale = 1 # a = 1m
 
-wavelength_band = c_meep/bandwidth
-band_meep = 1/wavelength_band
-
+c_mMHz = 300.0 # m/us or m MHz
+c_mGHz = 0.3 # m/ns or m GHz
+c_meep = 1.0 #Speed of Light is set to 1 -> Scale Invariance of Maxwell's Equations
+wavelength_1m = c_mMHz/freq_MHz # Wavelegnth in metres [m]
+wavelength_band_1m = c_mMHz/band_MHz #Wavelength in metres [m]
+freq_meep = c_meep/wavelength_1m # Freq in Inverse Meters [1/m]
+band_meep = c_meep/wavelength_band_1m # Bandwidth in Inverse Metere [1/m]
 sourceAmp = float(transmitter['sourceAmp'])
-R_tot = iceRange + pad
 
-R_cent = boreholeRadius/2 + R_tot/2
-
-Z_tot = iceDepth + airHeight + 2*pad
-H_aircent = airHeight/2 # Central Height of Air
-Z_icecent = iceDepth/2 # Central Depth of Ice
-r_cent = boreholeRadius/2
-iceRange_wo_bh = R_tot-boreholeRadius #size of Ice Block
-
+#RESOLUTION
 nice = 1.78
 resolution = 12.5	#how many pixels per meter
-mpp = 1/resolution    # meters per pixel
+mpp = 1/resolution    # meters per pixel, also dx
 column_size = iceRange/mpp	# number of pixels in the column
 vice = 1/nice   	# phase velocity in ice
-t_start = R_tot/vice # approximate time to reach steady state
-#TODO: Check, t_start can be shorter
 
-print('r_tx=', sourceRange)
-print('H_aircent', H_aircent)
-print('Z_icecent', Z_icecent)
-def nProfile_func(R):
-    z = R[2]
-    A = 1.78
-    B = 0.43
-    C = 0.0132 #1/m
-    #return mp.Medium(index=A-B*math.exp(-C*(z + Z_tot/2 - H_air)))
-    return mp.Medium(index= A - B * math.exp(-C * z))
+t_start_ns = 20.0 #ns
+t_start_meep = t_start_ns*c_mGHz
+print('Start Time in [m]', t_start_meep)
 
+S_courant = 0.5 #Courant Factor S -> dt = S dx / c or S mpp /c
+dt_meep = S_courant * mpp
+dt_ns = dt_meep/c_mGHz
+dt_us = dt_meep/c_mMHz
+print('dt_m = ', dt_meep, 'm')
+print('dt_ns = ', dt_ns, 'ns')
+t_end_meep = 2*nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
+t_end_ns = t_end_meep/c_mGHz
+
+t_space_meep = np.arange(0, t_end_meep, dt_meep)
+t_space_ns = t_space_meep/c_mGHz
+nSteps = int(t_end_meep / dt_meep)
+
+fsamp_MHz = 1/dt_us
+wavel_samp = c_mMHz/fsamp_MHz # THIS IS THE SAME AS DT_M
+fsamp_meep = 1/wavel_samp # 1 / DT_M
+print('sample frequency', fsamp_MHz)
+
+print('Size of Time Space =', len(t_space_meep), 'nSteps t_end_meep/mpp =', nSteps)
+
+print(freq_meep-band_meep/2, freq_meep+band_meep/2, fsamp_meep)
+#Redefine Geometry for Meep
+R_tot = iceRange + pad + dpml# Total Geometry Radius (cylindrical coordinate system) including the padded region
+
+R_cent = boreholeRadius/2 + R_tot/2 # Center of the Geometry (here center means half of the radius)
+
+Z_tot = iceDepth + airHeight + 2*pad #Total Geometry Height: Including Ice and Air and the padded region
+H_aircent = airHeight/2 # Central Height of Air #
+Z_icecent = iceDepth/2 # Central Depth of Ice
+r_cent = boreholeRadius/2 # Centre of Breohole
+iceRange_wo_bh = R_tot-boreholeRadius #size of Ice Block without the borehole
+
+#DEFINE THE REFRACTIVE INDEX
 def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp):
     z = R[2]
     ii_z = findNearest(zprof_data, z)
     n_z = nprof_data[ii_z]
     return mp.Medium(index=n_z)
-##*********************************************************************##
+
+
+def band_limited_pulse(freq_meep=freq_meep, band_meep=band_meep, t_space_meep=t_space_meep, t_start_meep = t_start_meep):
+    fmin = freq_meep-band_meep/2
+    fmax = freq_meep + band_meep / 2
+    amp = sourceAmp
+
+    nSamples = len(t_space_meep)
+    impulse = np.zeros(nSamples)
+    ii0 = util.findNearest(t_space_meep, t_start_meep)
+    impulse[ii0] = amp
+    pulse_out = util.butterBandpassFilter(impulse, fmin, fmax, fsamp_meep) + 0j
+    return pulse_out
+pulse_out = band_limited_pulse(freq_meep, band_meep, t_space_meep, t_start_meep)
+
+def band_limited_pulse_meep(t, pulse_out=pulse_out, t_space_meep=t_space_meep): #DEFINED USING MEEP UNITS-> freq = 1/wavel
+    ii = findNearest(t_space_meep, t)
+    return pulse_out[ii]
+
+#TODO: Add Noise Sources
+#TODO: Add Attenuation
+
+pulse_example = []
+for t in t_space_meep:
+    pulse_example.append(band_limited_pulse_meep(t))
+print('pulse type:', type(pulse_example[0]))
+
+'''
+from matplotlib import pyplot as pl
+fig = pl.figure(figsize=(8,5),dpi=120)
+ax = fig.add_subplot(111)
+ax.plot(t_space_meep, pulse_example)
+ax.grid()
+ax.set_xlabel('Meep Time [m]')
+pl.show()
+
+t_space_ns = t_space_meep/c_mGHz
+fig = pl.figure(figsize=(8,5),dpi=120)
+ax = fig.add_subplot(111)
+ax.plot(t_space_ns, pulse_example)
+ax.grid()
+ax.set_xlabel('Time [ns]')
+pl.show()
+
+nSamples = len(pulse_example)
+spec_example = np.fft.rfft(pulse_example)
+freq_space_meep = np.fft.rfftfreq(nSamples, dt_meep)
+freq_space_MHz = np.fft.rfftfreq(nSamples, dt_us)
+
+fig = pl.figure(figsize=(8,5),dpi=120)
+ax = fig.add_subplot(111)
+ax.plot(freq_space_meep, abs(spec_example))
+ax.grid()
+ax.set_xlabel('Meep Frequency [1/wavelength]')
+pl.show()
+
+
+fig = pl.figure(figsize=(8,5),dpi=120)
+ax = fig.add_subplot(111)
+ax.plot(freq_space_MHz, abs(spec_example))
+ax.axvline(freq_MHz-band_MHz/2)
+ax.axvline(freq_MHz+band_MHz/2)
+
+ax.grid()
+ax.set_xlabel('Frequency [MHz]')
+pl.show()
+'''
 
 ##**********************Simulation Setup*******************************##
 dimensions = mp.CYLINDRICAL
 
-pml_layers = [mp.PML(pad)]
-cell = mp.Vector3(2*R_tot, mp.inf, Z_tot)
-
-
-'''
-    mp.Block(center=mp.Vector3(r_cent, 0, Z_icecent),
-             size=mp.Vector3(boreholeRadius, mp.inf, iceDepth),
-             material=mp.Medium(index=nair)),
-'''
-#TODO: Check -> Change remove borehole from geometry
+pml_layers = [mp.PML(dpml)] #TODO: Check if this is along the whole geometry
+cell = mp.Vector3(R_tot, mp.inf, Z_tot)
+#TODO: Should it be rather : cell = mp.Vector3(R_tot, mp.inf, Z_tot) ?
+print('Define Geometry')
 geometry_dipole = [
     mp.Block(center=mp.Vector3(R_cent, 0, H_aircent), #AIR
              size=mp.Vector3(iceRange, mp.inf, airHeight),
@@ -134,27 +225,17 @@ geometry_dipole = [
              material=nProfile_data)
 ]
 
-# create the source
 sources_dipole = []
-t_begin = 20.0
-
-#DEFINE SOURCE:
-def band_limited_pulse(t, t_start=t_begin, fmin=freq_meep-band_meep/2, fmax=freq_meep+band_meep/2, amp=sourceAmp):
-    nSamples = len(t)
-    dt = abs(t[1] - t[0])
-    fsamp = 1/dt
-    impulse = np.zeros(nSamples)
-    ii = util.findNearest(t, t_start)
-    impulse[ii] = amp
-
-    pulse_out = util.butterBandpassFilter(impulse, fmin, fmax, fsamp)
-    print(pulse_out)
-    return pulse_out
-
-source1 = mp.Source(mp.CustomSource(src_func = lambda t: band_limited_pulse()),
+'''
+source1 = mp.Source(mp.GaussianSource(frequency=freq_meep, fwidth=band_meep, start_time = t_start_meep),
                     component=mp.Ez,
                     center=mp.Vector3(sourceRange, 0, sourceDepth),
                     size=mp.Vector3(0,0,0))
+'''
+source1 = mp.Source(mp.CustomSource(src_func = band_limited_pulse_meep),
+                    component=mp.Ez,
+                    center=mp.Vector3(sourceRange, 0, sourceDepth))
+sources_dipole.append(source1)
 
 sources_dipole.append(source1)
 # create simulation
@@ -166,9 +247,6 @@ sim_dipole = mp.Simulation(force_complex_fields=True,
                 sources=sources_dipole,
                 resolution=resolution)
 
-#=================================================================
-# Get RX Functions
-#================================================================
 rxList = []
 nRx = len(rx_list)
 for i in range(nRx):
@@ -177,43 +255,30 @@ for i in range(nRx):
     pt_ij = mp.Vector3(rx_x, mp.inf, rx_z)
     rxList.append(pt_ij)
 print(rxList)
-c_mns = 0.3 #Speed of Light in m / ns
 
-#TODO: Check time definition!
-dt_ns = 0.5 # ns
-dt_m = dt_ns * c_mns # Meep Units a / c
-Courant = 0.5
-
-dt_C = Courant * mpp # The simulation time step [a/c] -> dt = C dr , C : Courant Factor, C = 0.5 (default)
-# For accurate sims, C <= n_max / sqrt(nDimensions)
-
-nSteps = int(t_start/dt_C) + 10
-print(nSteps)
+dt_C = S_courant * mpp
 pulse_rx_arr = np.zeros((nRx, nSteps),dtype='complex')
-tspace = np.linspace(0, t_start / c_mns, nSteps)
+
 def get_amp_at_t2(sim):
     nRx = len(rxList)
-    factor = dt_m / dt_C
+    factor = dt_meep / dt_C
     tstep = sim.timestep()
     ii_step = int(float(tstep) / factor) - 1 #TODO: Check if this starts as 0 or 1
     for i in range(nRx):
         rx_pt = rxList[i]
 
         amp_at_pt = sim.get_field_point(c=mp.Ez, pt=rx_pt)
-        '''
-        if rx_pt.z == sourceDepth and rx_pt.x == 20:
-            print('field at z = ', sourceDepth, 'm, E(z) =', amp_at_pt)
-        if rx_pt.z == -sourceDepth and rx_pt.x == 20:
-            print('field at z = ', -sourceDepth, 'm, E(z) =', amp_at_pt)
-        '''
         pulse_rx_arr[i, ii_step] = amp_at_pt
 
 path2sim = settings['path2output']
+print('Initialize Simulation')
 sim_dipole.init_sim()
+print('Defining Output Directory')
 sim_dipole.use_output_directory(path2sim)
-sim_dipole.run(mp.at_every(dt_C, get_amp_at_t2),until=t_start)
+print('Running Simulation \n')
+sim_dipole.run(mp.at_every(dt_C, get_amp_at_t2),until=t_end_meep)
 
-fname_out = path2sim + '/' + fname_prefix + 'z_tx_' + str(sourceDepth) + 'm_freq=' + str(frequency) + 'MHz_out.h5'
+fname_out = path2sim + '/' + fname_prefix + 'z_tx_' + str(sourceDepth) + 'm_freq=' + str(freq_MHz) + 'MHz_out.h5'
 
 for i in range(nRx):
     print('check if all elements are zero', np.all(pulse_rx_arr[i] == 0), pulse_rx_arr[i])
@@ -236,9 +301,13 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     output_hdf.attrs['iceRange'] = iceRange
     output_hdf.attrs['boreholeRadius'] = boreholeRadius
     output_hdf.attrs['sourceDepth'] = sourceDepth
-    output_hdf.attrs['frequency'] = frequency
+    output_hdf.attrs['frequency'] = freq_GHz
+    output_hdf.attrs['bandwidth'] = band_GHz
+    output_hdf.attrs['freq_samp'] = fsamp_MHz/1e3
+    output_hdf.attrs['dt'] = dt_ns
     output_hdf.attrs['sourceRange'] = sourceRange
     output_hdf.attrs['pad'] = pad
+    output_hdf.attrs['dpml'] = dpml
 
     rxList_out = []
     for i in range(nRx):
@@ -247,19 +316,13 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     rx_label = 'rxList'
     pulse_label = 'rxPulses'
     tspace_label = 'tspace'
-    '''
-    Ez_label = 'Ez'
-    Er_label = 'Er'
-    eps_label = 'epsilon_r'
-    Ez_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Ez)
-    Er_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Er)
-    Eps_data = sim_dipole.get_array(center=mp.Vector3(), size=cell, component=mp.Dielectric)
-    '''
+    zProfile_label = 'zProfile'
+    nProfile_label = 'nProfile'
 
+    add_data_to_hdf(output_hdf, zProfile_label, zprof_sp)
+    add_data_to_hdf(output_hdf, nProfile_label, nprof_sp)
     add_data_to_hdf(output_hdf, rx_label, rxList_out)
     add_data_to_hdf(output_hdf, pulse_label, pulse_rx_arr)
-    #add_data_to_hdf(output_hdf, Ez_label, Ez_data)
-    #add_data_to_hdf(output_hdf, Er_label, Er_data)
-    add_data_to_hdf(output_hdf, tspace_label, tspace)
-    #add_data_to_hdf(output_hdf, eps_label, Eps_data)
-    output_hdf.close()
+    add_data_to_hdf(output_hdf, tspace_label, t_space_ns)
+
+print('Simulation Complete')
