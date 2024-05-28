@@ -52,8 +52,6 @@ Meep: c = 1
 Length scale a = 1m
 Time = a/c = 1m
 Frequency = c/a (or 'inverse meters')
-
-
 '''
 
 fname_prefix = settings['prefix']
@@ -136,14 +134,23 @@ r_cent = boreholeRadius/2 # Centre of Breohole
 iceRange_wo_bh = R_tot-boreholeRadius #size of Ice Block without the borehole
 
 #DEFINE THE REFRACTIVE INDEX
+
+#Define Conducitivity (Attenuation)
+c_ms = 3e8 #Speed of Light SI units [m/s]
+eps_r_ice = nice**2
+epsilon0 = 8.85e-12 #Vacuum Permittivity SI units [F/m]
+cond_in_SM = 4.7e-6 # [S/m] Based on the Attenuation Coefficient (assuming A(f) = 1) Source: Aguilar et al. Radiofrequency ice dielectric measurements at Summit Station, Greenland
+cond_in_meep = (1/c_ms)*cond_in_SM/(eps_r_ice*epsilon0)
 def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp):
     z = R[2]
     ii_z = findNearest(zprof_data, z)
     n_z = nprof_data[ii_z]
+    #return mp.Medium(index=n_z, D_conductivity=cond_in_meep)
     return mp.Medium(index=n_z)
 
-
 def band_limited_pulse(freq_meep=freq_meep, band_meep=band_meep, t_space_meep=t_space_meep, t_start_meep = t_start_meep):
+    #This defines the time dependent E-field pulse generated at the transmitter [V/m]
+    # If I want to approximate Askayan emission, I need a physical description of the pulse amplitude
     fmin = freq_meep-band_meep/2
     fmax = freq_meep + band_meep / 2
     amp = sourceAmp
@@ -167,47 +174,6 @@ pulse_example = []
 for t in t_space_meep:
     pulse_example.append(band_limited_pulse_meep(t))
 print('pulse type:', type(pulse_example[0]))
-
-'''
-from matplotlib import pyplot as pl
-fig = pl.figure(figsize=(8,5),dpi=120)
-ax = fig.add_subplot(111)
-ax.plot(t_space_meep, pulse_example)
-ax.grid()
-ax.set_xlabel('Meep Time [m]')
-pl.show()
-
-t_space_ns = t_space_meep/c_mGHz
-fig = pl.figure(figsize=(8,5),dpi=120)
-ax = fig.add_subplot(111)
-ax.plot(t_space_ns, pulse_example)
-ax.grid()
-ax.set_xlabel('Time [ns]')
-pl.show()
-
-nSamples = len(pulse_example)
-spec_example = np.fft.rfft(pulse_example)
-freq_space_meep = np.fft.rfftfreq(nSamples, dt_meep)
-freq_space_MHz = np.fft.rfftfreq(nSamples, dt_us)
-
-fig = pl.figure(figsize=(8,5),dpi=120)
-ax = fig.add_subplot(111)
-ax.plot(freq_space_meep, abs(spec_example))
-ax.grid()
-ax.set_xlabel('Meep Frequency [1/wavelength]')
-pl.show()
-
-
-fig = pl.figure(figsize=(8,5),dpi=120)
-ax = fig.add_subplot(111)
-ax.plot(freq_space_MHz, abs(spec_example))
-ax.axvline(freq_MHz-band_MHz/2)
-ax.axvline(freq_MHz+band_MHz/2)
-
-ax.grid()
-ax.set_xlabel('Frequency [MHz]')
-pl.show()
-'''
 
 ##**********************Simulation Setup*******************************##
 dimensions = mp.CYLINDRICAL
@@ -316,13 +282,18 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     rx_label = 'rxList'
     pulse_label = 'rxPulses'
     tspace_label = 'tspace'
+    tspace_meep_label = 'tspace_meep'
+
     zProfile_label = 'zProfile'
     nProfile_label = 'nProfile'
+    txPulse_label = 'txPulse'
 
+    add_data_to_hdf(output_hdf, txPulse_label, pulse_out)
     add_data_to_hdf(output_hdf, zProfile_label, zprof_sp)
     add_data_to_hdf(output_hdf, nProfile_label, nprof_sp)
     add_data_to_hdf(output_hdf, rx_label, rxList_out)
     add_data_to_hdf(output_hdf, pulse_label, pulse_rx_arr)
     add_data_to_hdf(output_hdf, tspace_label, t_space_ns)
+    add_data_to_hdf(output_hdf, tspace_meep_label, t_space_meep)
 
 print('Simulation Complete')
