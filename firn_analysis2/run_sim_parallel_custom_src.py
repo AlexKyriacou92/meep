@@ -92,7 +92,7 @@ sourceAmp = float(transmitter['sourceAmp'])
 
 #RESOLUTION
 nice = 1.78
-resolution = 12.5	#how many pixels per meter
+resolution = float(geometry['resolution'])	#how many pixels per meter
 mpp = 1/resolution    # meters per pixel, also dx
 column_size = iceRange/mpp	# number of pixels in the column
 vice = 1/nice   	# phase velocity in ice
@@ -103,6 +103,9 @@ print('Start Time in [m]', t_start_meep)
 
 S_courant = 0.5 #Courant Factor S -> dt = S dx / c or S mpp /c
 dt_meep = S_courant * mpp
+
+#dt_meep = mpp
+
 dt_ns = dt_meep/c_mGHz
 dt_us = dt_meep/c_mMHz
 print('dt_m = ', dt_meep, 'm')
@@ -160,6 +163,7 @@ def band_limited_pulse(freq_meep=freq_meep, band_meep=band_meep, t_space_meep=t_
     ii0 = util.findNearest(t_space_meep, t_start_meep)
     impulse[ii0] = amp
     pulse_out = util.butterBandpassFilter(impulse, fmin, fmax, fsamp_meep) + 0j
+    #pulse_out = impulse
     return pulse_out
 pulse_out = band_limited_pulse(freq_meep, band_meep, t_space_meep, t_start_meep)
 
@@ -197,13 +201,18 @@ source1 = mp.Source(mp.GaussianSource(frequency=freq_meep, fwidth=band_meep, sta
                     component=mp.Ez,
                     center=mp.Vector3(sourceRange, 0, sourceDepth),
                     size=mp.Vector3(0,0,0))
+
+source1 = mp.Source(mp.CustomSource(src_func = band_limited_pulse_meep),
+                    component=mp.Ez,
+                    center=mp.Vector3(sourceRange, 0, sourceDepth),
+                    size=mp.Vector3(0.01,0,0.25)) # TODO: Adding size
 '''
 source1 = mp.Source(mp.CustomSource(src_func = band_limited_pulse_meep),
                     component=mp.Ez,
-                    center=mp.Vector3(sourceRange, 0, sourceDepth))
+                    center=mp.Vector3(sourceRange, 0, sourceDepth)) # TODO: Adding size
+#sources_dipole.append(source1)
 sources_dipole.append(source1)
-
-sources_dipole.append(source1)
+#print('source:',source1.src)
 # create simulation
 sim_dipole = mp.Simulation(force_complex_fields=True,
                 cell_size=cell,
@@ -225,6 +234,7 @@ print(rxList)
 dt_C = S_courant * mpp
 pulse_rx_arr = np.zeros((nRx, nSteps),dtype='complex')
 
+
 def get_amp_at_t2(sim):
     nRx = len(rxList)
     factor = dt_meep / dt_C
@@ -232,10 +242,20 @@ def get_amp_at_t2(sim):
     ii_step = int(float(tstep) / factor) - 1 #TODO: Check if this starts as 0 or 1
     for i in range(nRx):
         rx_pt = rxList[i]
-
         amp_at_pt = sim.get_field_point(c=mp.Ez, pt=rx_pt)
         pulse_rx_arr[i, ii_step] = amp_at_pt
+'''
 
+def get_amp_at_t2(sim):
+    nRx = len(rxList)
+    #factor = dt_meep / dt_C
+    tstep = sim.timestep()
+    ii_step = findNearest(t_space_meep, tstep) #TODO: Check if this starts as 0 or 1
+    for i in range(nRx):
+        rx_pt = rxList[i]
+        amp_at_pt = sim.get_field_point(c=mp.Ez, pt=rx_pt)
+        pulse_rx_arr[i, ii_step] = amp_at_pt
+'''
 path2sim = settings['path2output']
 print('Initialize Simulation')
 sim_dipole.init_sim()
@@ -243,6 +263,7 @@ print('Defining Output Directory')
 sim_dipole.use_output_directory(path2sim)
 print('Running Simulation \n')
 sim_dipole.run(mp.at_every(dt_C, get_amp_at_t2),until=t_end_meep)
+#sim_dipole.run(mp.at_every(dt_meep, get_amp_at_t2),until=t_end_meep)
 
 fname_out = path2sim + '/' + fname_prefix + 'z_tx_' + str(sourceDepth) + 'm_freq=' + str(freq_MHz) + 'MHz_out.h5'
 
