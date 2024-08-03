@@ -1,0 +1,9 @@
+[DATAFILES]
+FNAME_1 = test/summit_horizon_air_z_z_tx_50.0_dtheta=3.0_askaryan.h5
+
+[LABELS]
+label1 = Air
+
+[RX]
+Z_RX = 10.0
+X_RX = 50.0
