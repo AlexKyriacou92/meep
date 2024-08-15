@@ -1,0 +1,25 @@
+[SETTINGS]
+prefix = summit_horizon_air_z
+path2output = test
+
+[GEOMETRY]
+iceDepth = 100.0
+airHeight = 25.0
+iceRange = 100.0
+boreholeRadius = 0.15
+pad = 10.0
+resolution = 20
+
+[REFRACTIVE INDEX]
+data_file = nProf_Air.txt
+
+[SOURCE]
+startTime = 50.0
+sourceDepth = 50.0
+sourceRange = 0.0
+dthetaV = 4.0
+showerEnergy=1e18
+attenuationEquivalent=500.
+
+[RECEIVER]
+rx_list = rx_list_80m.txt
