@@ -96,7 +96,7 @@ dt_ns = dt_meep/c_mGHz
 dt_us = dt_meep/c_mMHz
 print('dt_m = ', dt_meep, 'm')
 print('dt_ns = ', dt_ns, 'ns')
-t_end_meep = 2*nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
+t_end_meep = nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
 t_end_ns = t_end_meep/c_mGHz
 
 t_space_meep = np.arange(0, t_end_meep, dt_meep)
@@ -217,10 +217,19 @@ sim_dipole.init_sim()
 tend_initial = time.time()
 now = datetime.datetime.now()
 duration = tend_initial-tstart_initial
-print('Simulation Initializeation Compelete, simulation run starting at: ', now)
+print('Simulation Initialization Complete, simulation run starting at: ', now)
 print('Duration: ', datetime.timedelta(seconds=duration))
+print('')
 sim_dipole.use_output_directory(path2sim)
+
+tstart_run = time.time()
 sim_dipole.run(mp.at_every(dt_C, get_amp_at_t2),until=t_end_meep)
+print('')
+tend_run = time.time()
+now = datetime.datetime.now()
+duration = tend_run - tstart_run
+print('Simulation Run Complete at', now)
+print('Duration: ', datetime.timedelta(seconds=duration))
 
 fname_out = path2sim + '/' + fname_prefix + '_z_tx_' + str(sourceDepth) + '_dtheta=' + str(dtheta_nu) + '_askaryan.h5'
 for i in range(nRx):
@@ -276,5 +285,5 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
 
     add_data_to_hdf(output_hdf, tspace_label, t_space_ns)
     add_data_to_hdf(output_hdf, tspace_meep_label, t_space_meep)
-
-print('Simulation Complete')
+now = datetime.datetime.now()
+print('Simulation Complete at', now)
