@@ -1,3 +1,5 @@
+import datetime
+
 import numpy as np
 import math
 import h5py
@@ -21,8 +23,9 @@ print('Initiating Simulation of a Askaryan pulse generated from a point source i
 config_file = os.path.join(os.path.dirname(__file__), fname_config)
 config = configparser.ConfigParser()
 config.read(config_file)
-
-
+now = datetime.datetime.now()
+print('Simulation Started at: ', now)
+print('')
 #Input Parameters
 print('Input Parameters from config file', fname_config)
 
@@ -103,7 +106,7 @@ print('nSteps=',nSteps)
 fsamp_MHz = 1/dt_us
 wavel_samp = c_mMHz/fsamp_MHz # THIS IS THE SAME AS DT_M
 fsamp_meep = 1/wavel_samp # 1 / DT_M
-print('sample frequency', fsamp_MHz)
+print('sample frequency', fsamp_MHz, 'MHz')
 
 print('Size of Time Space =', len(t_space_meep), 'nSteps t_end_meep/mpp =', nSteps)
 #Redefine Geometry for Meep
@@ -209,6 +212,8 @@ def get_amp_at_t2(sim):
 
 path2sim = settings['path2output']
 sim_dipole.init_sim()
+now = datetime.datetime.now()
+print('Simulation Initializeation Compelete, simulation run starting at: ', now)
 sim_dipole.use_output_directory(path2sim)
 sim_dipole.run(mp.at_every(dt_C, get_amp_at_t2),until=t_end_meep)
 
