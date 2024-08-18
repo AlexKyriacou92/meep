@@ -8,6 +8,7 @@ import configparser
 from mpi4py import MPI
 import meep as mp
 import os
+import time
 from util import get_data, findNearest, nProfile_func
 import Askaryan_Signal
 from Askaryan_Signal import create_pulse, TeV
@@ -211,9 +212,13 @@ def get_amp_at_t2(sim):
         pulse_r_rx_arr[i, ii_step] = amp_r_at_pt
 
 path2sim = settings['path2output']
+tstart_initial = time.time()
 sim_dipole.init_sim()
+tend_initial = time.time()
 now = datetime.datetime.now()
+duration = tend_initial-tstart_initial
 print('Simulation Initializeation Compelete, simulation run starting at: ', now)
+print('Duration: ', datetime.timedelta(seconds=duration))
 sim_dipole.use_output_directory(path2sim)
 sim_dipole.run(mp.at_every(dt_C, get_amp_at_t2),until=t_end_meep)
 
