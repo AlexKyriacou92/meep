@@ -96,7 +96,7 @@ dt_ns = dt_meep/c_mGHz
 dt_us = dt_meep/c_mMHz
 print('dt_m = ', dt_meep, 'm')
 print('dt_ns = ', dt_ns, 'ns')
-t_end_meep = nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
+t_end_meep = 2*nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
 t_end_ns = t_end_meep/c_mGHz
 
 t_space_meep = np.arange(0, t_end_meep, dt_meep)
