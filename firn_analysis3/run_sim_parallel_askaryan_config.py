@@ -160,7 +160,10 @@ t_start_us = t_start_ns/1e3
 
 #Define Askaryan Pulse at Source
 pulse_in, tspace_in_ns = create_pulse(Esh=Esh_TeV, dtheta_v=dtheta_nu,R_alpha=R_alpha, t_min=-t_start_us, t_max=500e-3-t_start_us,z_alpha=sourceDepth)
+print('nSteps=', nSteps)
+print('len(pulse_in) = ', len(pulse_in), 'len(tspace_in)', len(tspace_in_ns))
 tspace_meep = tspace_in_ns * c_mGHz
+print('len(tspace_meep)', len(tspace_meep))
 def pulse_meep(t, pulse_in=pulse_in, t_space_in=tspace_in_ns):
     tspace_meep = t_space_in * c_mGHz # Meep Time Domain - units of distance
     if t < max(tspace_meep):
@@ -168,7 +171,7 @@ def pulse_meep(t, pulse_in=pulse_in, t_space_in=tspace_in_ns):
         return pulse_in[ii]
     else:
         return 0
-
+print('len(tspace_meep) 2', len(tspace_meep))
 source1 = mp.Source(mp.CustomSource(src_func = pulse_meep),
                     component=mp.Ez,
                     center=mp.Vector3(sourceRange, 0, sourceDepth))
@@ -196,12 +199,13 @@ print(rxList)
 
 pulse_z_rx_arr = np.zeros((nRx, nSteps),dtype='complex')
 pulse_r_rx_arr = np.zeros((nRx, nSteps),dtype='complex')
-
+tspace_actual = np.zeros((nRx, nSteps),dtype='float')
 dt_C = S_courant*mpp
 def get_amp_at_t2(sim):
     nRx = len(rxList)
     factor = dt_meep / dt_C
     tstep = sim.timestep()
+    time_meep = sim.meep_time()
     ii_step = int(float(tstep) / factor) - 1
     for i in range(nRx):
         rx_pt = rxList[i]
@@ -210,7 +214,7 @@ def get_amp_at_t2(sim):
 
         pulse_z_rx_arr[i, ii_step] = amp_z_at_pt
         pulse_r_rx_arr[i, ii_step] = amp_r_at_pt
-
+        tspace_actual[i, ii_step] = time_meep
 path2sim = settings['path2output']
 tstart_initial = time.time()
 sim_dipole.init_sim()
@@ -285,5 +289,8 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
 
     add_data_to_hdf(output_hdf, tspace_label, t_space_ns)
     add_data_to_hdf(output_hdf, tspace_meep_label, t_space_meep)
+    add_data_to_hdf(output_hdf, 'tspace_actual', tspace_actual)
+    add_data_to_hdf(output_hdf, 'tspace_tx', tspace_in_ns)
+
 now = datetime.datetime.now()
 print('Simulation Complete at', now)
