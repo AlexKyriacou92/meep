@@ -13,6 +13,10 @@ from util import get_data, findNearest, nProfile_func
 import Askaryan_Signal
 from Askaryan_Signal import create_pulse, TeV
 
+'''
+This script simulates an Askaryan pulse propagating through ice
+'''
+
 comm = MPI.COMM_WORLD
 
 if len(sys.argv) == 2:
@@ -65,7 +69,7 @@ airHeight = float(geometry['airHeight'])     # height of air
 iceRange = float(geometry['iceRange']) #radius of domain
 boreholeRadius = float(geometry['boreholeRadius']) #radius of borehole
 pad = float(geometry['pad'])
-dpml = pad/2
+dpml = pad # Changed from /2
 
 sourceDepth = float(source['sourceDepth']) #depth of diple below ice
 sourceRange = float(source['sourceRange']) + boreholeRadius/2
@@ -85,6 +89,12 @@ mpp = 1/resolution    # meters per pixel, also dx
 column_size = iceRange/mpp	# number of pixels in the column
 vice = 1/nice   	# phase velocity in ice
 
+# Set Decimation Factor
+if 'decimation_factor' in receiver:
+    decimation_factor = float(receiver['decimation_factor'])
+else:
+    decimation_factor = 1
+
 t_start_ns = float(source['startTime']) #ns TODO: Make Start Time Controllable
 t_start_meep = t_start_ns*c_mGHz
 print('Start Time in [m]', t_start_meep)
@@ -92,10 +102,15 @@ print('Start Time in [m]', t_start_meep)
 S_courant = 0.5 #Courant Factor S -> dt = S dx / c or S mpp /c
 dt_meep = S_courant * mpp
 
-dt_ns = dt_meep/c_mGHz
-dt_us = dt_meep/c_mMHz
-print('dt_m = ', dt_meep, 'm')
-print('dt_ns = ', dt_ns, 'ns')
+dt_ns = dt_meep/c_mGHz # Time resolution in FDTD
+dt_us = dt_meep/c_mMHz #
+
+dt_ns_deci = dt_ns * decimation_factor
+print('dt_m = ', dt_meep, 'm (before decimation)')
+print('dt_ns = ', dt_ns, 'ns (before decimation)')
+print('dt_ns = ', dt_ns_deci, ' ns (after decimation)')
+f_nyq_deci = 1/(2*dt_ns_deci)
+print('f_nyq = ', f_nyq_deci, ' GHz (after decimation)')
 #t_end_meep = 2*nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
 
 iceMaxPath = np.sqrt(iceRange**2 + iceDepth**2)
@@ -133,16 +148,13 @@ def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp):
     n_z = nprof_data[ii_z]
     return mp.Medium(index=n_z)
 
-
 ##*********************************************************************##
 
 ##**********************Simulation Setup*******************************##
 dimensions = mp.CYLINDRICAL
 
-#pml_layers = [mp.PML(pad)]
-#pml_layers = [mp.PML(thickness=pad)]
 pml_layers = [mp.Absorber(thickness=pad)]
-cell = mp.Vector3(2*R_tot, mp.inf, Z_tot)
+cell = mp.Vector3(2*R_tot, mp.inf, 2*Z_tot)
 
 geometry_dipole = [
     mp.Block(center=mp.Vector3(r_cent, 0, Z_icecent),
@@ -158,6 +170,7 @@ geometry_dipole = [
 
 #Define Askaryan Signal
 sources_dipole = []
+
 #Create Source with Askaryan Emission
 Esh_eV = float(source['showerEnergy'])
 Esh_TeV = 1e18/TeV # Energy of Neutrino-Induced Shower 10^18 eV  TODO: Make Config Controlled
@@ -178,12 +191,12 @@ def pulse_meep(t, pulse_in=pulse_in, t_space_in=tspace_in_ns):
         return pulse_in[ii]
     else:
         return 0
-print('len(tspace_meep) 2', len(tspace_meep))
+
 source1 = mp.Source(mp.CustomSource(src_func = pulse_meep),
                     component=mp.Ez,
                     center=mp.Vector3(sourceRange, 0, sourceDepth))
-
 sources_dipole.append(source1)
+
 # create simulation
 sim_dipole = mp.Simulation(force_complex_fields=True,
                 cell_size=cell,
@@ -192,6 +205,7 @@ sim_dipole = mp.Simulation(force_complex_fields=True,
                 geometry=geometry_dipole,
                 sources=sources_dipole,
                 resolution=resolution)
+
 #=================================================================
 # Get RX Functions
 #================================================================
@@ -204,48 +218,10 @@ for i in range(nRx):
     rxList.append(pt_ij)
 print(rxList)
 
-pulse_z_rx_arr = np.zeros((nRx, nSteps),dtype='complex')
-pulse_r_rx_arr = np.zeros((nRx, nSteps),dtype='complex')
-tspace_actual = np.zeros((nRx, nSteps),dtype='float')
 dt_C = S_courant*mpp
-def get_amp_at_t2(sim):
-    nRx = len(rxList)
-    factor = dt_meep / dt_C
-    tstep = sim.timestep()
-    time_meep = sim.meep_time()
-    ii_step = int(float(tstep) / factor) - 1
-    for i in range(nRx):
-        rx_pt = rxList[i]
-        amp_z_at_pt = sim.get_field_point(c=mp.Ez, pt=rx_pt)
-        amp_r_at_pt = sim.get_field_point(c=mp.Er, pt=rx_pt)
 
-        pulse_z_rx_arr[i, ii_step] = amp_z_at_pt
-        pulse_r_rx_arr[i, ii_step] = amp_r_at_pt
-        tspace_actual[i, ii_step] = time_meep
 path2sim = settings['path2output']
-tstart_initial = time.time()
-sim_dipole.init_sim()
-tend_initial = time.time()
-now = datetime.datetime.now()
-duration = tend_initial-tstart_initial
-print('Simulation Initialization Complete, simulation run starting at: ', now)
-print('Duration: ', datetime.timedelta(seconds=duration))
-print('')
-sim_dipole.use_output_directory(path2sim)
-
-tstart_run = time.time()
-sim_dipole.run(mp.at_every(dt_C, get_amp_at_t2),until=t_end_meep)
-print('')
-tend_run = time.time()
-now = datetime.datetime.now()
-duration = tend_run - tstart_run
-print('Simulation Run Complete at', now)
-print('Duration: ', datetime.timedelta(seconds=duration))
-
 fname_out = path2sim + '/' + fname_prefix + '_z_tx_' + str(sourceDepth) + '_dtheta=' + str(dtheta_nu) + '_askaryan.h5'
-for i in range(nRx):
-    print('check if all elements [r] are zero', np.all(pulse_r_rx_arr[i] == 0), pulse_r_rx_arr[i])
-    print('check if all elements [z] are zero', np.all(pulse_z_rx_arr[i] == 0), pulse_z_rx_arr[i])
 
 def add_data_to_hdf(hdf_in, label, dataset):
     '''
@@ -259,15 +235,25 @@ def add_data_to_hdf(hdf_in, label, dataset):
     if check_bool == False:
         hdf_in.create_dataset(label, data=dataset)
 
+# Open HDF5 File to Run Simulation
 with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf:
+    pulse_r_label = 'rxPulses_r'
+    pulse_z_label = 'rxPulses_z'
+
+    pulse_r_ds = output_hdf.create_dataset(pulse_r_label, (nRx, 0), maxshape=(nRx, None), dtype='complex128')
+    pulse_z_ds = output_hdf.create_dataset(pulse_z_label, (nRx, 0), maxshape=(nRx, None), dtype='complex128')
+
     output_hdf.attrs['iceDepth'] = iceDepth
     output_hdf.attrs['airHeight'] = airHeight
     output_hdf.attrs['iceRange'] = iceRange
     output_hdf.attrs['boreholeRadius'] = boreholeRadius
     output_hdf.attrs['sourceDepth'] = sourceDepth
     output_hdf.attrs['freq_samp'] = fsamp_MHz/1e3
-    output_hdf.attrs['dt'] = dt_ns
+    output_hdf.attrs['dt_ns_res'] = dt_ns
+    output_hdf.attrs['dt'] = dt_ns_deci
+    output_hdf.attrs['dt_meep'] = dt_meep
     output_hdf.attrs['sourceRange'] = sourceRange
+    output_hdf.attrs['res'] = resolution
     output_hdf.attrs['pad'] = pad
     output_hdf.attrs['dpml'] = dpml
 
@@ -276,28 +262,77 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
         rx_i = rxList[i]
         rxList_out.append([rx_i.x, rx_i.z])
     rx_label = 'rxList'
-    pulse_r_label = 'rxPulses_r'
-    pulse_z_label = 'rxPulses_z'
-
-    tspace_label = 'tspace'
-    tspace_meep_label = 'tspace_meep'
 
     zProfile_label = 'zProfile'
     nProfile_label = 'nProfile'
     txPulse_label = 'txPulse'
 
-    #add_data_to_hdf(output_hdf, txPulse_label, pulse_out)
     add_data_to_hdf(output_hdf, txPulse_label, pulse_in)
     add_data_to_hdf(output_hdf, zProfile_label, zprof_sp)
     add_data_to_hdf(output_hdf, nProfile_label, nprof_sp)
     add_data_to_hdf(output_hdf, rx_label, rxList_out)
-    add_data_to_hdf(output_hdf, pulse_r_label, pulse_r_rx_arr)
-    add_data_to_hdf(output_hdf, pulse_z_label, pulse_z_rx_arr)
-
-    add_data_to_hdf(output_hdf, tspace_label, t_space_ns)
-    add_data_to_hdf(output_hdf, tspace_meep_label, t_space_meep)
-    add_data_to_hdf(output_hdf, 'tspace_actual', tspace_actual)
     add_data_to_hdf(output_hdf, 'tspace_tx', tspace_in_ns)
 
-now = datetime.datetime.now()
-print('Simulation Complete at', now)
+    def get_amp_at_t2(sim):
+        nRx = len(rxList)
+        factor = (dt_meep / dt_C) * decimation_factor
+        tstep = sim.timestep()
+        ii_step = int(float(tstep) / factor) - 1
+
+        if ii_step < nSteps:
+            z_vals = np.zeros(nRx, dtype='complex128')
+            r_vals = np.zeros(nRx, dtype='complex128')
+
+            for i in range(nRx):
+                rx_pt = rxList[i]
+                z_vals[i] = sim.get_field_point(c=mp.Ez, pt=rx_pt)
+                r_vals[i] = sim.get_field_point(c=mp.Er, pt=rx_pt)
+
+            # Resize datasets
+            pulse_r_ds.resize((nRx, ii_step+1))
+            pulse_z_ds.resize((nRx, ii_step+1))
+
+            # Write new values
+            pulse_r_ds[:, ii_step] = r_vals
+            pulse_z_ds[:, ii_step] = z_vals
+
+    #Initialize Simulation
+    print('Initialize Simulation')
+    tstart_initial = time.time()
+    sim_dipole.init_sim()
+    tend_initial = time.time()
+
+    now = datetime.datetime.now()
+
+    duration = tend_initial-tstart_initial
+
+    print('Simulation Initialization Complete')
+    print('Duration: ', datetime.timedelta(seconds=duration))
+    print('')
+
+    # Set Output Directory
+    sim_dipole.use_output_directory(path2sim)
+
+    print('Simulation run starting at: ', now)
+    print('')
+
+    tstart_run = time.time()
+
+    # Running the Simulation with decimation
+    sim_dipole.run(mp.at_every(dt_C * decimation_factor, get_amp_at_t2), until=t_end_meep)
+
+    print('')
+    tend_run = time.time()
+    now = datetime.datetime.now()
+    duration = tend_run - tstart_run
+    print('Simulation Run Complete at', now)
+    print('Duration: ', datetime.timedelta(seconds=duration))
+
+    # Check if all elements are zero
+    for i in range(nRx):
+        print('check if all elements [r] are zero', np.all(pulse_r_ds[i] == 0),pulse_r_ds[i])
+        print('check if all elements [z] are zero', np.all(pulse_z_ds[i] == 0), pulse_z_ds[i])
+
+    now = datetime.datetime.now()
+    print('Simulation Complete at', now)
+    print('Data saved to ', fname_out)
