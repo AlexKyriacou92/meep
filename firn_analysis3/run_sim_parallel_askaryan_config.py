@@ -153,7 +153,8 @@ def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp):
 ##**********************Simulation Setup*******************************##
 dimensions = mp.CYLINDRICAL
 
-pml_layers = [mp.Absorber(thickness=pad)]
+#pml_layers = [mp.Absorber(thickness=pad)]
+pml_layers = [mp.PML(thickness=pad)] # Using PML means I only have a permittivity grid (instead of conductivity)
 cell = mp.Vector3(2*R_tot, mp.inf, 2*Z_tot)
 
 geometry_dipole = [
@@ -197,8 +198,10 @@ source1 = mp.Source(mp.CustomSource(src_func = pulse_meep),
                     center=mp.Vector3(sourceRange, 0, sourceDepth))
 sources_dipole.append(source1)
 
+complex_fields_bool = False # No need for complex fields -> might save on memory?
+
 # create simulation
-sim_dipole = mp.Simulation(force_complex_fields=True,
+sim_dipole = mp.Simulation(force_complex_fields=complex_fields_bool,
                 cell_size=cell,
                 dimensions=mp.CYLINDRICAL,
                 boundary_layers=pml_layers,
