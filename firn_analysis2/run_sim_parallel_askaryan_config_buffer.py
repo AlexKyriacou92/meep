@@ -360,10 +360,11 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     print('Duration: ', datetime.timedelta(seconds=duration))
 
     # Check if all elements are zero
+    '''    
     for i in range(nRx):
         print('check if all elements [r] are zero', np.all(pulse_r_ds[i] == 0),pulse_r_ds[i])
         print('check if all elements [z] are zero', np.all(pulse_z_ds[i] == 0), pulse_z_ds[i])
-
+    '''
     now = datetime.datetime.now()
     print('Simulation Complete at', now)
     print('Data saved to ', fname_out)
