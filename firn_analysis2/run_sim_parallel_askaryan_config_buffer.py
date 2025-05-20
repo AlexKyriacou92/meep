@@ -121,9 +121,13 @@ print('dt_ns = ', dt_ns_deci, ' ns (after decimation)')
 f_nyq_deci = 1/(2*dt_ns_deci)
 print('f_nyq = ', f_nyq_deci, ' GHz (after decimation)')
 #t_end_meep = 2*nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
-
 iceMaxPath = np.sqrt(iceRange**2 + iceDepth**2)
-t_end_meep = 2*nice*iceMaxPath
+
+if 'cutoff_factor' in receiver:
+    cutoff_factor = float(receiver['cutoff_factor'])
+else:
+    cutoff_factor = 1.2
+t_end_meep = cutoff_factor*nice*iceMaxPath
 
 
 t_end_ns = t_end_meep/c_mGHz
@@ -162,8 +166,8 @@ def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp):
 ##**********************Simulation Setup*******************************##
 dimensions = mp.CYLINDRICAL
 
-#pml_layers = [mp.Absorber(thickness=pad)]
-pml_layers = [mp.PML(thickness=pad)]
+pml_layers = [mp.Absorber(thickness=pad)]
+#pml_layers = [mp.PML(thickness=pad)]
 
 cell = mp.Vector3(2*R_tot, mp.inf, 2*Z_tot)
 
