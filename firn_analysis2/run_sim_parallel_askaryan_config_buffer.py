@@ -167,8 +167,15 @@ def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp):
 ##**********************Simulation Setup*******************************##
 dimensions = mp.CYLINDRICAL
 
-#pml_layers = [mp.Absorber(thickness=pad)]
-pml_layers = [mp.PML(thickness=pad)]
+if 'absorb_mode' in geometry:
+    absorb_mode = int(geometry['absorb_mode'])
+    if absorb_mode == 1:
+        pml_layers = [mp.Absorber(thickness=pad)]
+    else:
+        pml_layers = [mp.PML(thickness=pad)]
+else:
+    absorb_mode = 0
+    pml_layers = [mp.PML(thickness=pad)]
 
 cell = mp.Vector3(2*R_tot, mp.inf, 2*Z_tot)
 
@@ -301,6 +308,7 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     output_hdf.attrs['n_buffer'] = n_buffer
     output_hdf.attrs['pad'] = pad
     output_hdf.attrs['dpml'] = dpml
+    output_hdf.attrs['absorb_mode'] = absorb_mode
 
     rxList_out = []
     for i in range(nRx):
