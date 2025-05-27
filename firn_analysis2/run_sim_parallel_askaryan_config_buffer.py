@@ -125,8 +125,11 @@ print('f_nyq = ', f_nyq_deci, ' GHz (after decimation)')
 #t_end_meep = 2*nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
 
 iceMaxPath = np.sqrt(iceRange**2 + iceDepth**2)
-t_end_meep = 2*nice*iceMaxPath
-
+if 'cutoff_factor' in receiver:
+    cutoff_factor = float(receiver['cutoff_factor'])
+else:
+    cutoff_factor = 1.1
+t_end_meep = cutoff_factor*nice*iceMaxPath
 
 t_end_ns = t_end_meep/c_mGHz
 
