@@ -124,7 +124,7 @@ f_nyq_deci = 1/(2*dt_ns_deci)
 print('f_nyq = ', f_nyq_deci, ' GHz (after decimation)')
 #t_end_meep = 2*nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
 
-iceMaxPath = np.sqrt(iceRange**2 + iceDepth**2)
+iceMaxPath = iceRange #np.sqrt(iceRange**2 + iceDepth**2)
 if 'cutoff_factor' in receiver:
     cutoff_factor = float(receiver['cutoff_factor'])
 else:
@@ -152,7 +152,7 @@ R_cent = boreholeRadius/2 + R_tot/2 # Center of the Geometry (here center means 
 Z_tot = iceDepth + airHeight + 2*pad #Total Geometry Height: Including Ice and Air and the padded region
 H_aircent = airHeight/2 # Central Height of Air #
 Z_icecent = iceDepth/2 # Central Depth of Ice
-r_cent = boreholeRadius/2 # Centre of Breohole
+r_cent = boreholeRadius/2 # Centre of Borehole
 iceRange_wo_bh = R_tot-boreholeRadius #size of Ice Block without the borehole
 
 
