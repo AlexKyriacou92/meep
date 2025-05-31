@@ -122,7 +122,6 @@ print('dt_ns = ', dt_ns, 'ns (before decimation)')
 print('dt_ns = ', dt_ns_deci, ' ns (after decimation)')
 f_nyq_deci = 1/(2*dt_ns_deci)
 print('f_nyq = ', f_nyq_deci, ' GHz (after decimation)')
-#t_end_meep = 2*nice*iceRange # Enough 'time' for the signal to traverse the simulation domain twice if n = n_ice
 
 iceMaxPath = iceRange #np.sqrt(iceRange**2 + iceDepth**2)
 if 'cutoff_factor' in receiver:
@@ -145,21 +144,37 @@ print('sample frequency', fsamp_MHz, 'MHz')
 
 print('Size of Time Space =', len(t_space_meep), 'nSteps t_end_meep/mpp =', nSteps)
 #Redefine Geometry for Meep
-R_tot = iceRange + pad + dpml# Total Geometry Radius (cylindrical coordinate system) including the padded region
+if 'rangeBuffer' in geometry:
+    rangeBuffer = float(geometry['rangeBuffer'])
+else:
+    rangeBuffer = pad
+
+R_tot = iceRange + rangeBuffer #+ pad + dpml# Total Geometry Radius (cylindrical coordinate system) including the padded region
 
 R_cent = boreholeRadius/2 + R_tot/2 # Center of the Geometry (here center means half of the radius)
 
 Z_tot = iceDepth + airHeight + 2*pad #Total Geometry Height: Including Ice and Air and the padded region
-H_aircent = airHeight/2 # Central Height of Air #
-Z_icecent = iceDepth/2 # Central Depth of Ice
+Delta_Z = airHeight/2 - iceDepth/2
+
+sourceDepth_meep = sourceDepth + Delta_Z
+
+#Adjust Height to Meep coordinates - Meep enforces size symmetry about the x and z-axes
+
+H_aircent = airHeight/2 + Delta_Z # Central Height of Air #
+Z_icecent = iceDepth/2 + Delta_Z # Central Depth of Ice
 r_cent = boreholeRadius/2 # Centre of Borehole
 iceRange_wo_bh = R_tot-boreholeRadius #size of Ice Block without the borehole
 
 
-def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp):
-    z = R[2]
-    ii_z = findNearest(zprof_data, z)
-    n_z = nprof_data[ii_z]
+def nProfile_data(R, zprof_data=zprof_sp, nprof_data=nprof_sp, z_shift=Delta_Z):
+    z_meep = R[2] # Depth coordinates in Meep
+    z_true = z_meep - z_shift # True depth
+    if z_true <= iceDepth:
+        ii_z = findNearest(zprof_data, z_true)
+        n_z = nprof_data[ii_z]
+    else:
+        ii_z = findNearest(zprof_data, iceDepth)
+        n_z = nprof_data[ii_z]
     return mp.Medium(index=n_z, D_conductivity=0)
 
 ##*********************************************************************##
@@ -177,7 +192,7 @@ else:
     absorb_mode = 0
     pml_layers = [mp.PML(thickness=pad)]
 
-cell = mp.Vector3(2*R_tot, mp.inf, 2*Z_tot)
+cell = mp.Vector3(2*R_tot, mp.inf, Z_tot)
 
 geometry_dipole = [
     mp.Block(center=mp.Vector3(r_cent, 0, Z_icecent),
@@ -242,7 +257,7 @@ def pulse_meep(t, pulse_in=pulse_in, t_space_in=tspace_in_ns):
 
 source1 = mp.Source(mp.CustomSource(src_func = pulse_meep),
                     component=mp.Ez,
-                    center=mp.Vector3(sourceRange, 0, sourceDepth))
+                    center=mp.Vector3(sourceRange, 0, sourceDepth_meep))
 sources_dipole.append(source1)
 
 # create simulation
@@ -257,14 +272,17 @@ sim_dipole = mp.Simulation(force_complex_fields=False,
 #=================================================================
 # Get RX Functions
 #================================================================
+rxList_meep = []
 rxList = []
 nRx = len(rx_list)
 for i in range(nRx):
     rx_x = rx_list[i][0]
     rx_z = rx_list[i][1]
-    pt_ij = mp.Vector3(rx_x, mp.inf, rx_z)
-    rxList.append(pt_ij)
-print(rxList)
+    rxList.append([rx_x, rx_z])
+    pt_meep_ij = mp.Vector3(rx_x, mp.inf, rx_z + Delta_Z)
+    rxList_meep.append(pt_meep_ij)
+print(rxList_meep)
+rxList = np.array(rxList)
 
 dt_C = S_courant*mpp
 
@@ -310,12 +328,7 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     output_hdf.attrs['dpml'] = dpml
     output_hdf.attrs['absorb_mode'] = absorb_mode
 
-    rxList_out = []
-    for i in range(nRx):
-        rx_i = rxList[i]
-        rxList_out.append([rx_i.x, rx_i.z])
     rx_label = 'rxList'
-
     zProfile_label = 'zProfile'
     nProfile_label = 'nProfile'
     txPulse_label = 'txPulse'
@@ -323,7 +336,7 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     add_data_to_hdf(output_hdf, txPulse_label, pulse_in)
     add_data_to_hdf(output_hdf, zProfile_label, zprof_sp)
     add_data_to_hdf(output_hdf, nProfile_label, nprof_sp)
-    add_data_to_hdf(output_hdf, rx_label, rxList_out)
+    add_data_to_hdf(output_hdf, rx_label, rxList)
     add_data_to_hdf(output_hdf, 'tspace_tx', tspace_in_ns)
 
     factor = (dt_meep / dt_C) * decimation_factor
@@ -333,37 +346,32 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
 
     # Buffer state tracker
     current_buffer_index = 0
+    step_index = 0  # total number of samples stored so far
+
 
     def get_amp_at_t2(sim):
-        global pulse_r_buffer, pulse_z_buffer, current_buffer_index
+        global pulse_r_buffer, pulse_z_buffer, current_buffer_index, step_index
 
-        nRx = len(rxList)
-        tstep = sim.timestep()
-        ii_step = int(float(tstep) / factor) - 1
+        # Store Ez and Ex fields into the buffer
+        for i, rx_pt in enumerate(rxList_meep):
+            pulse_r_buffer[i, current_buffer_index] = sim.get_field_point(mp.Ex, rx_pt)
+            pulse_z_buffer[i, current_buffer_index] = sim.get_field_point(mp.Ez, rx_pt)
 
-        if ii_step < nSteps:
+        current_buffer_index += 1
+        step_index += 1
+
+        # If the buffer is full, write it to disk
+        if current_buffer_index == n_buffer:
+            #print('Writing full buffer at step', step_index, '...')
+            old_size = pulse_r_ds.shape[1]
+            new_size = old_size + current_buffer_index  # pulse_r_ds.shape[1]
+
+            pulse_r_ds.resize((nRx, new_size))
+            pulse_z_ds.resize((nRx, new_size))
             for i in range(nRx):
-                rx_pt = rxList[i]
-                pulse_z_buffer[i, current_buffer_index] = sim.get_field_point(c=mp.Ez, pt=rx_pt)
-                pulse_r_buffer[i, current_buffer_index] = sim.get_field_point(c=mp.Er, pt=rx_pt)
-            current_buffer_index += 1
-
-            # If buffer full or last step, flush to HDF5
-            if current_buffer_index == n_buffer or ii_step == nSteps - 1:
-                old_size = pulse_r_ds.shape[1]
-                new_size = old_size + current_buffer_index
-
-                # Resize datasets
-                pulse_r_ds.resize((nRx, new_size))
-                pulse_z_ds.resize((nRx, new_size))
-
-                # Write buffers to disk
-                pulse_r_ds[:, old_size:new_size] = pulse_r_buffer[:, :current_buffer_index]
-                pulse_z_ds[:, old_size:new_size] = pulse_z_buffer[:, :current_buffer_index]
-
-                # Reset buffer index
-                current_buffer_index = 0
-
+                pulse_z_ds[i, old_size:new_size] = pulse_z_buffer[i, :current_buffer_index]
+                pulse_r_ds[i, old_size:new_size] = pulse_r_buffer[i, :current_buffer_index]
+            current_buffer_index = 0
 
     #Initialize Simulation
     print('Initialize Simulation')
@@ -390,6 +398,18 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     # Running the Simulation with decimation
     sim_dipole.run(mp.at_every(dt_C * decimation_factor, get_amp_at_t2), until=t_end_meep)
 
+    # ========== Final flush for leftover buffer ==========
+    if current_buffer_index > 0:
+        print('Final flush: writing remaining ', current_buffer_index, 'steps...')
+        old_size = pulse_r_ds.shape[1]
+        new_size = old_size + current_buffer_index #pulse_r_ds.shape[1]
+
+        pulse_r_ds.resize((nRx, new_size))
+        pulse_z_ds.resize((nRx, new_size))
+        for i in range(nRx):
+            pulse_z_ds[i, old_size:new_size] = pulse_z_buffer[i, :current_buffer_index]
+            pulse_r_ds[i, old_size:new_size] = pulse_r_buffer[i, :current_buffer_index]
+
     print('')
     tend_run = time.time()
     now = datetime.datetime.now()
@@ -397,12 +417,6 @@ with h5py.File(fname_out, 'a', driver='mpio', comm=MPI.COMM_WORLD) as output_hdf
     print('Simulation Run Complete at', now)
     print('Duration: ', datetime.timedelta(seconds=duration))
 
-    # Check if all elements are zero
-    '''    
-    for i in range(nRx):
-        print('check if all elements [r] are zero', np.all(pulse_r_ds[i] == 0),pulse_r_ds[i])
-        print('check if all elements [z] are zero', np.all(pulse_z_ds[i] == 0), pulse_z_ds[i])
-    '''
     now = datetime.datetime.now()
     print('Simulation Complete at', now)
     print('Data saved to ', fname_out)
