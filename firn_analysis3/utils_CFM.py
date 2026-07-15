@@ -329,8 +329,10 @@ def get_tspace(fname_hdf):
 
     '''
     with h5py.File(fname_hdf, 'r') as hdf_in:
-        tspace_meep = np.array(hdf_in['tspace_meep'])
-        nSamples = len(tspace_meep)
+        #tspace_meep = np.array(hdf_in['tspace_meep'])
+        #nSamples = len(tspace_meep)
+        rxPulses = np.array(hdf_in['rxPulses_z'])
+        nSamples = len(rxPulses[0,:])
         dt = float(hdf_in.attrs['dt'])
     tspace = np.linspace(0, nSamples*dt, nSamples)
     return tspace
